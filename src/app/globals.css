@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0f0f0f;
+  --foreground: #ededed;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Telegram Web App overrides */
+body.telegram-webapp {
+  background: var(--tg-theme-bg-color, #0f0f0f);
+  color: var(--tg-theme-text-color, #ededed);
+}
