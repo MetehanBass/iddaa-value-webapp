@@ -1,16 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { LEAGUES } from "@/lib/config";
 import { getFavorites } from "@/lib/favorites";
 
 export default function Home() {
   const [favCount, setFavCount] = useState(0);
+  const pathname = usePathname();
 
-  useEffect(() => {
+  const loadFavCount = useCallback(() => {
     getFavorites().then(favs => setFavCount(favs.length));
   }, []);
+
+  // Reload fav count on every visit (including back navigation)
+  useEffect(() => {
+    loadFavCount();
+  }, [pathname, loadFavCount]);
+
+  // Also reload on window focus (user comes back from other page)
+  useEffect(() => {
+    window.addEventListener("focus", loadFavCount);
+    return () => window.removeEventListener("focus", loadFavCount);
+  }, [loadFavCount]);
 
   return (
     <div className="pt-6">
@@ -37,7 +50,7 @@ export default function Home() {
       {/* Bottom Actions */}
       <div className="grid grid-cols-2 gap-2.5 mt-3">
         <Link
-          href="/favorites"
+          href="/my-favorites"
           className="flex items-center justify-center gap-2 bg-emerald-900/20 rounded-xl px-3.5 py-3 border border-emerald-700/30 hover:border-emerald-600/50 active:scale-[0.98] transition-all"
         >
           <span className="text-sm">⭐</span>
