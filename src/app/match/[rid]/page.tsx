@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import type { MatchResult } from "@/lib/types";
 import { MARKET_NAMES } from "@/lib/config";
 import { PlayerPropCard } from "@/components/PlayerPropCard";
 import { Loading } from "@/components/Loading";
+import { ErrorState } from "@/components/ErrorState";
 import { BackButton } from "@/components/BackButton";
 
 export default function MatchPage() {
@@ -18,16 +19,22 @@ export default function MatchPage() {
 
   const [result, setResult] = useState<MatchResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
+    setLoading(true);
+    setError(false);
     fetch(`/api/props/${rid}?name=${encodeURIComponent(matchName)}`)
       .then(r => r.json())
       .then(data => setResult(data))
-      .catch(console.error)
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [rid, matchName]);
 
+  useEffect(() => { loadData(); }, [loadData]);
+
   if (loading) return <Loading text="Value bahisler taranıyor..." />;
+  if (error) return <ErrorState message="Bahis verileri yüklenirken hata oluştu" onRetry={loadData} />;
   if (!result) return <div className="text-center py-12 text-zinc-500">Veri yüklenemedi</div>;
 
   // Group props by market

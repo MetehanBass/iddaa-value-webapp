@@ -5,25 +5,28 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { LEAGUES } from "@/lib/config";
 import { getFavorites } from "@/lib/favorites";
+import { Onboarding, useOnboarding } from "@/components/Onboarding";
 
 export default function Home() {
   const [favCount, setFavCount] = useState(0);
   const pathname = usePathname();
+  const { showOnboarding, checked, dismiss } = useOnboarding();
 
   const loadFavCount = useCallback(() => {
     getFavorites().then(favs => setFavCount(favs.length));
   }, []);
 
-  // Reload fav count on every visit (including back navigation)
   useEffect(() => {
     loadFavCount();
   }, [pathname, loadFavCount]);
 
-  // Also reload on window focus (user comes back from other page)
   useEffect(() => {
     window.addEventListener("focus", loadFavCount);
     return () => window.removeEventListener("focus", loadFavCount);
   }, [loadFavCount]);
+
+  if (!checked) return null;
+  if (showOnboarding) return <Onboarding onComplete={dismiss} />;
 
   return (
     <div className="pt-6">

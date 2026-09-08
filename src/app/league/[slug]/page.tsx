@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { Match } from "@/lib/types";
 import type { LeagueConfig } from "@/lib/config";
 import { Loading } from "@/components/Loading";
+import { ErrorState } from "@/components/ErrorState";
 import { BackButton } from "@/components/BackButton";
 
 interface DateGroup {
@@ -51,19 +52,25 @@ export default function LeaguePage() {
   const [league, setLeague] = useState<LeagueConfig | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
+    setLoading(true);
+    setError(false);
     fetch(`/api/matches/${slug}`)
       .then(r => r.json())
       .then(data => {
         setLeague(data.league);
-        setMatches(data.matches);
+        setMatches(data.matches || []);
       })
-      .catch(console.error)
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [slug]);
 
+  useEffect(() => { loadData(); }, [loadData]);
+
   if (loading) return <Loading text="Maçlar yükleniyor..." />;
+  if (error) return <ErrorState message="Maçlar yüklenirken bir hata oluştu" onRetry={loadData} />;
 
   const groups = groupByDate(matches);
 
