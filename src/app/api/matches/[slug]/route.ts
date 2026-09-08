@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import { LEAGUES } from "@/lib/config";
 import { fetchLeagueMatches } from "@/lib/scraper";
 import { parseMatches } from "@/lib/parser";
+import { isRateLimited, getClientIp } from "@/lib/rate-limit";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
+  const ip = getClientIp(req);
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const { slug } = await params;
   const league = LEAGUES.find(l => l.slug === slug);
   if (!league) {
@@ -17,7 +23,6 @@ export async function GET(
     const html = await fetchLeagueMatches(slug, league.leagueId);
     const matches = parseMatches(html, league.name);
 
-    // Filter: future matches within 5 days
     const now = Math.floor(Date.now() / 1000);
     const maxTs = now + 5 * 86400;
     const filtered = matches.filter(

@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import { fetchPlayerProps } from "@/lib/scraper";
 import { parsePlayerProps } from "@/lib/parser";
 import { filterAndEnrich } from "@/lib/filter";
+import { isRateLimited, getClientIp } from "@/lib/rate-limit";
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ rid: string }> },
 ) {
+  const ip = getClientIp(req);
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const { rid } = await params;
   const url = new URL(req.url);
   const matchName = url.searchParams.get("name") || "";
