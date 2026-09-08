@@ -1,42 +1,78 @@
 "use client";
 
+const API_BASE = "https://iddaa-value-player-finder.fly.dev";
+
 export interface Favorite {
   team: string;
   league: string;
 }
 
-const STORAGE_KEY = "iddaa_favorites";
+function getInitData(): string {
+  if (typeof window === "undefined") return "";
+  return window.Telegram?.WebApp?.initData || "";
+}
 
-export function getFavorites(): Favorite[] {
-  if (typeof window === "undefined") return [];
+async function apiFetch(path: string, options?: RequestInit) {
+  const initData = getInitData();
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Telegram-Init-Data": initData,
+      ...(options?.headers || {}),
+    },
+  });
+  return res.json();
+}
+
+// Local cache to avoid repeated API calls
+let _cache: Favorite[] | null = null;
+let _cacheTime = 0;
+const CACHE_TTL = 30_000; // 30 seconds
+
+export async function getFavorites(): Promise<Favorite[]> {
+  if (_cache && Date.now() - _cacheTime < CACHE_TTL) return _cache;
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
+    const data = await apiFetch("/api/favorites");
+    if (Array.isArray(data)) {
+      _cache = data;
+      _cacheTime = Date.now();
+      return data;
+    }
+  } catch (e) {
+    console.error("Failed to fetch favorites:", e);
+  }
+  return _cache || [];
+}
+
+export async function addFavorite(team: string, league: string): Promise<void> {
+  try {
+    await apiFetch("/api/favorites", {
+      method: "POST",
+      body: JSON.stringify({ team, league }),
+    });
+    _cache = null; // invalidate cache
+  } catch (e) {
+    console.error("Failed to add favorite:", e);
   }
 }
 
-export function addFavorite(team: string, league: string): void {
-  const favs = getFavorites();
-  if (favs.some(f => f.team.toLowerCase() === team.toLowerCase() && f.league === league)) return;
-  favs.push({ team, league });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
+export async function removeFavorite(team: string, league: string): Promise<void> {
+  try {
+    await apiFetch("/api/favorites", {
+      method: "DELETE",
+      body: JSON.stringify({ team, league }),
+    });
+    _cache = null;
+  } catch (e) {
+    console.error("Failed to remove favorite:", e);
+  }
 }
 
-export function removeFavorite(team: string, league: string): void {
-  const favs = getFavorites().filter(
-    f => !(f.team.toLowerCase() === team.toLowerCase() && f.league === league),
-  );
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
-}
-
-export function isFavorite(team: string, league: string): boolean {
-  return getFavorites().some(
+export async function isFavorite(team: string, league: string): Promise<boolean> {
+  const favs = await getFavorites();
+  return favs.some(
     f => f.team.toLowerCase() === team.toLowerCase() && f.league === league,
   );
-}
-
-export function getFavoriteLeagues(): string[] {
-  return [...new Set(getFavorites().map(f => f.league))];
 }

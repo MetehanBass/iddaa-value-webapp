@@ -9,7 +9,7 @@ export default function Home() {
   const [favCount, setFavCount] = useState(0);
 
   useEffect(() => {
-    setFavCount(getFavorites().length);
+    getFavorites().then(favs => setFavCount(favs.length));
   }, []);
 
   return (

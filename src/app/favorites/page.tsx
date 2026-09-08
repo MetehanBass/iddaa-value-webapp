@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { LEAGUES } from "@/lib/config";
 import { getFavorites, addFavorite, removeFavorite, isFavorite } from "@/lib/favorites";
@@ -11,43 +11,58 @@ import { Loading } from "@/components/Loading";
 export default function FavoritesPage() {
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
   const [teams, setTeams] = useState<string[]>([]);
+  const [favSet, setFavSet] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const [, setRefresh] = useState(0); // force re-render on fav change
+  const [favCount, setFavCount] = useState(0);
 
   const favLeagues = LEAGUES.filter(l => !l.favExcluded);
 
+  // Load fav count
+  useEffect(() => {
+    getFavorites().then(favs => setFavCount(favs.length));
+  }, []);
+
+  // Load teams when league selected
   useEffect(() => {
     if (!selectedLeague) return;
     setLoading(true);
-    fetch(`/api/matches/${selectedLeague}`)
-      .then(r => r.json())
-      .then(data => {
-        const matches: Match[] = data.matches || [];
-        const teamSet = new Set<string>();
-        for (const m of matches) {
-          const parts = m.name.split(" - ");
-          for (const p of parts) {
-            const t = p.trim();
-            if (t) teamSet.add(t);
-          }
+
+    Promise.all([
+      fetch(`/api/matches/${selectedLeague}`).then(r => r.json()),
+      getFavorites(),
+    ]).then(([data, favs]) => {
+      const matches: Match[] = data.matches || [];
+      const teamSet = new Set<string>();
+      for (const m of matches) {
+        for (const p of m.name.split(" - ")) {
+          const t = p.trim();
+          if (t) teamSet.add(t);
         }
-        setTeams([...teamSet].sort());
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      }
+      setTeams([...teamSet].sort());
+
+      // Build set of fav team keys for this league
+      const fs = new Set<string>();
+      for (const f of favs) {
+        if (f.league === selectedLeague) fs.add(f.team.toLowerCase());
+      }
+      setFavSet(fs);
+    }).catch(console.error).finally(() => setLoading(false));
   }, [selectedLeague]);
 
-  function toggleFavorite(team: string) {
+  const toggleFavorite = useCallback(async (team: string) => {
     if (!selectedLeague) return;
-    if (isFavorite(team, selectedLeague)) {
-      removeFavorite(team, selectedLeague);
+    const key = team.toLowerCase();
+    if (favSet.has(key)) {
+      await removeFavorite(team, selectedLeague);
+      setFavSet(prev => { const n = new Set(prev); n.delete(key); return n; });
+      setFavCount(c => c - 1);
     } else {
-      addFavorite(team, selectedLeague);
+      await addFavorite(team, selectedLeague);
+      setFavSet(prev => new Set(prev).add(key));
+      setFavCount(c => c + 1);
     }
-    setRefresh(n => n + 1);
-  }
-
-  const favCount = getFavorites().length;
+  }, [selectedLeague, favSet]);
 
   // League selection view
   if (!selectedLeague) {
@@ -113,7 +128,7 @@ export default function FavoritesPage() {
       ) : (
         <div className="grid grid-cols-2 gap-1.5">
           {teams.map(team => {
-            const fav = isFavorite(team, selectedLeague);
+            const fav = favSet.has(team.toLowerCase());
             return (
               <button
                 key={team}

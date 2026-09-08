@@ -14,6 +14,8 @@ interface TelegramWebApp {
     setText(text: string): void;
     onClick(cb: () => void): void;
   };
+  initData: string;
+  initDataUnsafe: Record<string, unknown>;
   themeParams: Record<string, string>;
 }
 
